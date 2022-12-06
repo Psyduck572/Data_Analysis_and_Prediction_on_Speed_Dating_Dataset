@@ -1,0 +1,265 @@
+---
+title: "new"
+output: html_document
+date: "2022-11-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+dataset = read.csv(file = 'Speed Dating Data.csv')
+
+dataset$iid <- as.factor(dataset$iid)
+dataset$id <- as.factor(dataset$id)
+dataset$pid <- as.factor(dataset$pid)
+dataset$idg <- as.factor(dataset$idg)
+dataset$gender <- as.factor(dataset$gender)
+dataset$condtn <- as.factor(dataset$condtn)
+dataset$wave <- as.factor(dataset$wave)
+dataset$match <- as.factor(dataset$match)
+dataset$samerace <- as.factor(dataset$samerace)
+dataset$race_o <- as.factor(dataset$race_o)
+dataset$dec_o <- as.factor(dataset$dec_o)
+dataset$zipcode <- as.factor(dataset$zipcode)
+dataset$race <- as.numeric(dataset$race)
+dataset$goal <- as.numeric(dataset$goal)
+dataset$date <- as.numeric(dataset$date)
+dataset$go_out <- as.numeric(dataset$go_out)
+dataset$field_cd <- as.factor(dataset$field_cd)
+dataset$career_c <- as.factor(dataset$career_c)
+dataset$length <- as.factor(dataset$length)
+dataset$numdat_2 <- as.factor(dataset$numdat_2)
+dataset$mn_sat <- as.numeric(gsub(",","",levels(dataset$mn_sat)))[dataset$mn_sat]
+dataset$date_3 <- as.factor(dataset$date_3)
+dataset$income <- as.numeric(gsub(",","",dataset$income))
+
+library(mice)
+library(VIM)
+library(ggplot2)
+library(tidyverse)
+library(pls)
+library(caret)
+head(dataset)
+```
+
+Q1 Does people estimate themselves just like how others estimate them?
+```{r warning=F}
+outside.est <- aggregate(dataset[,c("iid", "gender", "age",
+                                "attr3_1", "sinc3_1", "intel3_1", 
+                               "fun3_1", "amb3_1", 
+                               "attr_o", "sinc_o", "intel_o", 
+                               "fun_o", "amb_o")],
+                    by = list(dataset$iid),
+                    function (x) mean(x, na.rm = TRUE))
+ggplot(outside.est, aes(x=attr3_1, y=attr_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Attractivness")
+ggplot(outside.est, aes(x=sinc3_1, y=sinc_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(2.5,10)) +
+  ggtitle("Sincere")
+ggplot(outside.est, aes(x=intel3_1, y=intel_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(2.5,10)) +
+  ggtitle("Intelligent")
+ggplot(outside.est, aes(x=fun3_1, y=fun_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Fun")
+ggplot(outside.est, aes(x=amb3_1, y=amb_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Ambitious")
+```
+In average people seem to overestimate themselves. Only for attract and fun variation in estimates is quite high. For all other characteristics people tend to give average estimates (In order to see these characteristics in a person much more time  is needed)
+
+
+Q How happy do people expect to be with the people you meet during the speed-dating event according to their goals?
+```{r}
+dataset = dataset %>% drop_na(exphappy,goal,gender)
+ggplot(data = dataset) +
+	geom_point(aes(x = goal, y = exphappy, colour = gender))
+
+mod_exphappy = lm(exphappy~goal, data = dataset)
+summary(mod_exphappy)
+
+```
+
+```{r}
+dataset_men = subset(dataset, gender=="1")
+mod_exphappy_men = lm(exphappy~goal, data = dataset_men)
+summary(mod_exphappy_men)
+```
+```{r}
+dataset_women = subset(dataset, gender=="0")
+mod_exphappy_women = lm(exphappy~goal, data = dataset_women)
+summary(mod_exphappy_women)
+```
+
+Hence, we can see that overall, except people who wanted a serious relationship from this event, people all were happy with the people they met. Be more precisely, for boys who expect to meet new people and say they did it, and girls who want to get a date, they did not have a very great time. But others all had fun. 
+
+Q Is there a significant relationship between people's income and their primary goal in participating of a date?
+```{r}
+dataset = dataset %>% drop_na(goal,gender,income)
+ggplot(data = dataset, aes(x = income, y = goal, colour = gender, order = TRUE)) +
+    geom_point()+theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank())
+```
+Here, we can see that there is not much significant relationship between people's income and their primary goal in participating of a date, since prom the plot, it seems to be all even distributed. 
+
+
+Q Is there a correlation between the fields of study with the chance to get a match partner in speed match making? If so, which field of study has the greatest advantage in mate selection?
+```{r}
+dataset = dataset %>% drop_na(match,gender,field)
+dataset_field_match = subset(dataset, match=="1")
+library(janitor)
+match_count_field = data.frame(tabyl(dataset, match, field))
+head(match_count_field)
+ggplot(data.frame(dataset_field_match), aes(x=field)) +
+  geom_bar()+theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank())
+
+match_count_field = data.frame(t(match_count_field[2,-1]))
+```
+From the plot, we can see that people who work in roughly five kind of field are likely get a match.
+
+```{r}
+sort(match_count_field$X2, decreasing = TRUE)[1:5]
+rbind(subset(match_count_field,match_count_field==111),subset(match_count_field,match_count_field==98),subset(match_count_field,match_count_field==69),subset(match_count_field,match_count_field==45),subset(match_count_field,match_count_field==36))
+```
+
+Hence, we can see that people who work in Business, Law, MBA, Social.Work, and International.Affairs are likely get a match.
+
+
+
+
+Q If we define that if a woman gives her matched man a score 7 or above in like, she is likely going to have another date with him after the event, then can you predict if a women who is having the same race with her partner, having a age of 23, having Lawyer as her intended career, loving sports, tvsports, gaming, and thinking himself very fun and sincere(loving and very standard is a score higher or equal to 7), will ask a another date with her matched man?
+```{r}
+newdata <- subset(dataset, select=c(like,gender,int_corr,age,race,imprace,imprelig,income,goal,date,go_out,52:68,100:104))
+likely_date <- ifelse(newdata$like >= 7, yes = 1, no = 0)
+dat = data.frame(likely_date,newdata)
+#dat$likely_date <- as.factor(dat$likely_date)
+dat_cleaned <- subset(dat, gender ==0, select = -c(like, gender))
+dat_cleaned = dat_cleaned %>% drop_na(.)
+head(dat_cleaned)
+```
+First thing to do, we select the samples related to women and all numerical features as our feature candidates. After that, we need to find features which have strong corrolations with the repones variable, "likely_date."
+```{r}
+corr = cor(dat_cleaned)[,1]
+sort(abs(corr),decreasing = TRUE)
+```
+From the table above, we can see that fun, shar, intel, sinc, amb, exphappy, music, and race seem have a strong corrolation with the "likely_date." Hence, fun, shar, intel, sinc, amb, exphappy, music, and race seem most likely to be useful in predicting likely_date.
+
+Then we split the data into training and testing data, and we put 70% of the whole cleaned data into training set and the others into the testing set.
+```{r}
+set.seed(555)
+training.samples <- dat_cleaned$likely_date %>%
+  createDataPartition(p = 0.7, list = FALSE)
+train.data  <- dat_cleaned[training.samples, ]
+test.data <- dat_cleaned[-training.samples, ]
+```
+
+First model we use here is the Linear Support Vector Machine. We first tries an example first, using a two-dementional Linear SVM classification, which are "fun" and "shar."
+```{r}
+library(e1071)
+SVM_example = svm(formula = as.factor(likely_date) ~ fun+shar,
+                 data = train.data,
+                 type = 'C-classification',
+                 kernel = 'linear')
+plot(x = SVM_example, data = train.data[,c(1,30,32)])
+```
+We can see that red plots represent a woman who is willing to take another date with her partner after the event, and the yellow ones are the opposite side. The hyperline shown in the plot is the decision boundary which exactly what we use to predict women's decision based on the features of "fun" and "shar." Then we use the complete training dataset to do the LinearSVM modeling. 
+```{r}
+library(e1071)
+classifier = svm(formula = as.factor(likely_date) ~ fun+shar+intel+sinc+amb+exphappy+music+race,
+                 data = train.data,
+                 type = 'C-classification',
+                 kernel = 'linear')
+classifier
+```
+
+```{r}
+library(xtable)
+y_pred_SVM = predict(classifier, newdata = test.data)
+cm_SVM = table(test.data$likely_date, y_pred_SVM)
+confusionMatrix(cm_SVM)
+```
+From the "Confusion Matrix and Statistics," we can see that the overall accurcy of our LinearSVM model is pretty good which is 80.88%, and there is not any sign of overfitting issue herre.
+
+Then, we try another advanced supervised machine learning model--random forest. We first think of using the special case of random forest, bagging to do the modeling. Furthermore, before the whole modeling process, we use the 5-fold cross validation to find the best tuning parameter, which is number of features used for modeling the bagging model.
+```{r}
+library(randomForest)
+set.seed(555)
+model_rf <- train(
+  as.factor(likely_date) ~ fun+shar+intel+sinc+amb+exphappy+music+race, data = train.data, method = "rf",
+  scale = TRUE,
+  trControl = trainControl("cv", number = 5),
+  tuneLength = 10
+  )
+plot(model_rf)
+```
+From the cv plot, we can see that when number of features is three, it can help the training progress find the best model. Hence, using the optimal tuning parameter, we do the modeling for bagging. In case of some features may have some strong corrolations inteacting with each other, we improve our model, also taking random forest as a count. Here the following plot shows how bagging, randomforest1(m=sqrt(p)), and randomforest2(m=p/2) perform based on our training dataset. 
+```{r}
+set.seed(555)
+test.MSE.bag = list()
+test.MSE.RF1 = list()
+test.MSE.RF2 = list()
+for (i in 1:100){
+  bag_i <- randomForest(as.factor(likely_date) ~ ., data = train.data, mtry = 3, ntree = i)
+  RF1_i <- randomForest(as.factor(likely_date) ~ ., data = train.data, mtry = sqrt(3), ntree = i)
+  RF2_i <- randomForest(as.factor(likely_date) ~ ., data = train.data, mtry = 3/2, ntree = i)
+  
+  yhat.bag_i <- predict(bag_i, newdata = test.data, type = "response")
+  yhat.RF1_i <- predict(RF1_i, newdata = test.data, type = "response")
+  yhat.RF2_i <- predict(RF2_i, newdata = test.data, type = "response")
+  
+  MSE.bag = mean((as.numeric(yhat.bag_i) - test.data$likely_date)^2)
+  MSE.RF1 = mean((as.numeric(yhat.RF1_i) - test.data$likely_date)^2)
+  MSE.RF2 = mean((as.numeric(yhat.RF2_i) - test.data$likely_date)^2)
+  
+  test.MSE.bag[[i]] = MSE.bag
+  test.MSE.RF1[[i]] = MSE.RF1
+  test.MSE.RF2[[i]] = MSE.RF2
+}
+```
+
+```{r}
+plot(1:100, test.MSE.bag, col = "green", type = "l", xlab = "Number of Trees", ylab = "Test MSE", ylim = c(1.1, 1.3))
+lines(1:100, test.MSE.RF1, col = "red", type = "l")
+lines(1:100, test.MSE.RF2, col = "blue", type = "l")
+legend("topright", c("m = p", "m = sqrt(p)", "m = p/3"), col = c("green", "red", "blue"), cex = 1, lty = 1)
+```
+Hence, we can see that bagging is the best option to do the prediction, since overallspeaking, the green line basicly has lowest test MSE. On the other side, it can also tell use the there is not much corrolation among these eight features.
+```{r}
+y_pred_RF = predict(model_rf, newdata = test.data)
+cm_RF = table(test.data$likely_date, y_pred_RF)
+confusionMatrix(cm_RF)
+```
+Using the optimal model we have, we evaluate it on the testing dataset. From the "Confusion Matrix and Statistics," we can see that the overall accurcy of our Bagging model along with 3 features is pretty good which is 78.96%, and there is also not any sign of overfitting issue here. Although it is not as good as LinearSVM, it also does a great job. 
+
+Then we do a little application of the model we got. Let us do a prediction. There is an asian women who really love music, so happy to meet her partner during the event, and thinking herself very fun, sincere, ambitious, intelligent, and shared hobbies with her matched partner(assume loving and very standard is a score of 8). Will she ask a another date with her matched man?
+```{r}
+testDATA = data.frame(likely_date=NA,race=4,music=8,exphappy=8,sinc=8,intel=8,fun=8,amb=8,shar=8)
+
+if (predict(model_rf, newdata = testDATA)==1){
+  print("She is willing to ask for a second date!")
+}else{
+  "She may not ask for a second date!"
+}
+
+```
+The answer is yes! With the features we need, we can predict any women's decision!
+
+
+Conclusion:
+Overall speaking, when we predict women's decision of taking another date after the event, LinearSVM and RandomForest really do a great job. However, there is way more than perfect. We did not take the women's partners' information into the consideration. We believe the most chanllenging part is the data cleaning, since we need to put their partners' information into the same sample, which will be a huge process and really compliated. Besides, when the dataset is rebuiled, it will definitely grow larger, meaning more noise will be included in the dataset. At that point, LinearSVM may not be a good model to perform since it will be greatly influenced by outliers. What's more, though random forest is a great model to apply, it is so bad at interpretation. Hence, we need to consider other models or more advanced model like boosting or even deep learning algorithm like Convolutional Netural Network to make the accuracy better, dealing with the problem we have on the current models. That will be our future goal.
