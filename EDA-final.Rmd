@@ -1,0 +1,470 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.405 Group 12"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(mice)
+library(VIM)
+library(janitor)
+library(PerformanceAnalytics)
+```
+
+```{r}
+#Load datasets
+dataset = read.csv('Speed Dating Data.csv')
+speed_dating <- dataset
+df = dataset
+
+dataset$iid <- as.factor(dataset$iid)
+dataset$id <- as.factor(dataset$id)
+dataset$pid <- as.factor(dataset$pid)
+dataset$idg <- as.factor(dataset$idg)
+dataset$gender <- as.factor(dataset$gender)
+dataset$condtn <- as.factor(dataset$condtn)
+dataset$wave <- as.factor(dataset$wave)
+dataset$match <- as.factor(dataset$match)
+dataset$samerace <- as.factor(dataset$samerace)
+dataset$race_o <- as.factor(dataset$race_o)
+dataset$dec_o <- as.factor(dataset$dec_o)
+dataset$zipcode <- as.factor(dataset$zipcode)
+dataset$race <- as.factor(dataset$race)
+dataset$goal <- as.factor(dataset$goal)
+dataset$date <- as.factor(dataset$date)
+dataset$go_out <- as.factor(dataset$go_out)
+dataset$field_cd <- as.factor(dataset$field_cd)
+dataset$career_c <- as.factor(dataset$career_c)
+dataset$length <- as.factor(dataset$length)
+dataset$numdat_2 <- as.factor(dataset$numdat_2)
+dataset$mn_sat <- as.numeric(gsub(",","",levels(dataset$mn_sat)))[dataset$mn_sat]
+dataset$date_3 <- as.factor(dataset$date_3)
+```
+
+
+
+# Creator: Yihang Hu
+
+### Q1: Does people estimate themselves just like how others estimate them?
+
+```{r, warning=F}
+outside.est <- aggregate(dataset[,c("iid", "gender", "age",
+                                "attr3_1", "sinc3_1", "intel3_1", 
+                               "fun3_1", "amb3_1", 
+                               "attr_o", "sinc_o", "intel_o", 
+                               "fun_o", "amb_o")],
+                    by = list(dataset$iid),
+                    function (x) mean(x, na.rm = TRUE))
+ggplot(outside.est, aes(x=attr3_1, y=attr_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Attractivness")
+ggplot(outside.est, aes(x=sinc3_1, y=sinc_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(2.5,10)) +
+  ggtitle("Sincere")
+ggplot(outside.est, aes(x=intel3_1, y=intel_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(2.5,10)) +
+  ggtitle("Intelligent")
+ggplot(outside.est, aes(x=fun3_1, y=fun_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Fun")
+ggplot(outside.est, aes(x=amb3_1, y=amb_o)) + 
+  geom_point(position="jitter", alpha=0.5) + 
+  geom_abline() +
+  scale_y_continuous(limits=c(0,10)) +
+  ggtitle("Ambitious")
+```
+
+On average, people seem to overestimate themselves. Only for attract and fun variation in estimates is quite high. For all other characteristics people tend to give average estimates (In order to see these characteristics in a person much more time  is needed)
+
+
+### Q2: How happy do people expect to be with the people you meet during the speed-dating event according to their goals?
+
+```{r}
+dataset = dataset %>% drop_na(exphappy,goal,gender)
+ggplot(data = dataset) +
+	geom_point(aes(x = goal, y = exphappy, colour = gender))
+
+mod_exphappy = lm(exphappy~goal, data = dataset)
+summary(mod_exphappy)
+
+```
+
+```{r}
+dataset_men = subset(dataset, gender=="1")
+mod_exphappy_men = lm(exphappy~goal, data = dataset_men)
+summary(mod_exphappy_men)
+```
+
+```{r}
+dataset_women = subset(dataset, gender=="0")
+mod_exphappy_women = lm(exphappy~goal, data = dataset_women)
+summary(mod_exphappy_women)
+```
+
+Hence, we can see that overall, except people who wanted a serious relationship from this event, people all were happy with the people they met. Be more precisely, for boys who expect to meet new people and say they did it, and girls who want to get a date, they did not have a very great time. But others all had fun. 
+
+# Interpreter: Ivan Wang
+
+### Q1: What race has most people looking for speed dating?
+
+```{r}
+# Data Cleaning
+# 1. Transform 'gender' variables (Female = 0; Male = 1)
+speed_dating$gender <- ifelse(speed_dating$gender == 0, 'Female', 'Male')
+
+# 2. Transform 'match' variable (Yes = 1; No = 0)
+speed_dating$match <- ifelse(speed_dating$match == 1, 'Yes', 'No')
+```
+
+```{r}
+# Further data-cleaning (delete rows containing 'NA' in the 'race' column)
+sd_race <- speed_dating[!is.na(speed_dating$race),]
+```
+
+
+```{r}
+#Prepare descriptions of different race groups
+#(Black/African American=1
+#European/Caucasian-American=2 
+#Latino/Hispanic American=3 
+#Asian/Pacific Islander/Asian-American=4 
+#Native American=5
+#Other=6)
+race_des <- c('African American', 'European', 'Latino', 'Asian', 'Native American', 'Other')
+```
+
+```{r, warning=F}
+#Visualize the whole population
+sd_race %>% 
+  group_by(race) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = race, y = n)) +
+  geom_histogram(stat = 'identity', fill = 'lightblue') +
+  scale_x_continuous(breaks = seq(1, 6), labels = race_des) +
+  coord_flip()
+```
+
+The plot above shows one interesting point that there are no native Americans participate in the speed dating activity. 
+
+
+```{r, warning=F}
+#Visualize distribution of 'race' based on gender
+sd_race %>% 
+  group_by(gender, race) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = race, y = n)) +
+  geom_histogram(stat = 'identity', fill = 'blue') +
+  scale_x_continuous(breaks = seq(1, 6), labels = race_des) +
+  coord_flip() +
+  facet_grid(~gender)
+```
+
+Based on plots above, we can see that the distribution of race is roughly similar for both males and females. 
+
+### Q2: What is the distribution of the goal for speed dating?
+
+```{r}
+# Check if there are 'NAs' in the 'goal' column
+sum(is.na(speed_dating$goal == 'NA'))
+```
+
+It shows that there are 79 NAs in the goal column, and we might delete them for visualizing the distribution of 'goal'. 
+
+```{r}
+# Further data-cleaning (delete rows containing 'NA' in the 'goal' column)
+sd_goal <- speed_dating[!is.na(speed_dating$goal),]
+```
+
+```{r}
+#Prepare descriptions for numerical value of goals
+#(Seemed like a fun night out=1
+# To meet new people=2
+# To get a date=3
+# Looking for a serious relationship=4 
+# To say I did it=5
+# Other=6)
+
+goal_des <- c('Seemed like a fun night out', 'To meet new people', 'To get a date', 'Looking for a serious relationship', 'To say I did it', 'Other')
+```
+
+```{r, warning=F}
+#Visualize the whole population
+sd_goal %>% 
+  group_by(goal) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = goal, y = n)) +
+  geom_histogram(stat = 'identity', fill = 'lightblue') +
+  scale_x_continuous(breaks = seq(1, 6), labels = goal_des) +
+  coord_flip()
+```
+
+The plot above shows that most people choose speed dating for 'a fun night out'. 
+
+```{r, warning=F}
+#Visualize distribution of 'goal' based on gender
+sd_goal %>% 
+  group_by(gender, goal) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = goal, y = n)) +
+  geom_histogram(stat = 'identity', fill = 'blue') +
+  scale_x_continuous(breaks = seq(1, 6), labels = goal_des) +
+  coord_flip() +
+  facet_grid(~gender)
+```
+
+From the plots above, we can see that both genders choose speed dating for 'a fun night out'. Another thing worth noting is that for female, the goals of 'meeting new people' and 'fun night out' have similar number of people. 
+
+
+# Orator: Xiaowen Xie and Kunxuan He
+
+### Q1: What is the age distribution for speed dating people? How’s the age distributed in gender?
+
+```{r, warning=F}
+#Histogram
+speed_dating %>% 
+  ggplot(aes(age)) +
+  geom_histogram(fill = 'red', binwidth = 1)
+```
+
+```{r}
+#NUmber of people in different age groups
+speed_dating %>% 
+  group_by(age) %>% 
+  count(age) %>% 
+  arrange(desc(n))
+```
+
+We conclude that people at age 27 contribute significant number of speed-datings.
+
+```{r, warning=F}
+speed_dating %>% 
+  ggplot(aes(x=gender, y=age)) +
+  geom_boxplot(fill = 'lightblue')
+```
+
+
+### Q2: How is the distribution of successful & unsuccessful match among different age groups?
+
+```{r}
+# Check if there are 'NAs' in the 'match' column
+sum(is.na(speed_dating$match == 'NA'))
+```
+
+
+It shows that there are 0 NA in the 'match' column.
+
+```{r, warning=F}
+#Visualize
+speed_dating %>% 
+  ggplot(aes(x = age, fill = match)) +
+  geom_histogram(position = position_dodge(), binwidth = 1) +
+  theme_classic()
+```
+
+The plot above shows that the distribution of 'match' is roughly normally distributed among different age groups. The highest number of 'match' appears at age 25. On the other hand, the distribution of 'non-match' is right skewed. While most 'non-match' happen between age 20-30,  some 'non-matches' exist in the age group greater than 30. We can also see that the number of unsuccessful matches is more than the number of successful matches among all age groups. 
+
+
+# Deliverer: Yunbing Bai
+
+### Q1: Which study field has the most interest in speed dating? Which study field has the least interest in speed dating? How's it distributed in different gender group?
+
+```{r}
+# Check if there are NAs in the column of field_code
+sum(is.na(speed_dating$match == 'NA'))
+```
+It shows that there are 0 NA in the 'field_code' column.
+
+```{r}
+#Prepare descriptions for numerical value of field_code
+#(1= Law
+#2= Math
+#3= Social Science, Psychologist
+#4= Medical Science, Pharmaceuticals, and Bio Tech 
+#5= Engineering
+#6= English/Creative Writing/ Journalism
+#7= History/Religion/Philosophy
+#8= Business/Econ/Finance
+#9= Education, Academia
+#10= Biological Sciences/Chemistry/Physics 
+#11= Social Work
+#12= Undergrad/undecided
+#13= Political Science/International Affairs 
+#14= Film
+#15= Fine Arts/Arts Administration 
+#16= Languages
+#17= Architecture
+#18= Other
+fd_des <- c('Law', 'Math', 'Social Science, Psychologist', 'Medical Science, Pharmaceuticals, and Bio Tech', 'Engineering', 'English/Creative Writing/ Journalism', 'History/Religion/Philosophy', 'Business/Econ/Finance', 'Education, Academia', 'Biological Sciences/Chemistry/Physics', 'Social Work', 'Undergrad/undecided', 'Political Science/International Affairs', 'Film', 'Fine Arts/Arts Administration', 'Languages', 'Architecture', 'Other')
+```
+
+
+```{r, warning = F}
+#Visualize the whole population
+speed_dating %>% 
+  group_by(field_cd) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = field_cd, y = n)) +
+  geom_histogram(stat = 'identity', fill = 'lightblue') +
+  scale_x_continuous(breaks = seq(1, 18), labels = fd_des) +
+  coord_flip()
+```
+
+From the plot above, we can see that most people who are interested in speed-dating mostly major in Business/Economics/Finance. 
+
+```{r, warning = F}
+#Visualize the distribution in diffeerent gender group
+speed_dating %>% 
+  group_by(field_cd, gender) %>% 
+  summarise(n=n(), groups = 'drop') %>% 
+  ggplot(aes(x = field_cd, y = n, fill = gender)) +
+  geom_histogram(stat = 'identity', position = 'dodge') +
+  scale_x_continuous(breaks = seq(1, 18), labels = fd_des) +
+  coord_flip()
+```
+
+From the plot above, we can see that most males who are interested in speed-dating mostly major in Business/Economics/Finance. Females majoring in Education, Academia are mostly interested in speed-dating. 
+
+### Q2: Which parameters have the most significant influence on the match result?
+
+```{r, warning=F}
+#pick all data from surveys before the end of event (sign up sheet and scorecard)
+sgf = subset(df,select = c(match,gender,int_corr,samerace,age_o,pf_o_att,pf_o_sin,pf_o_int,
+                           pf_o_fun,pf_o_amb,pf_o_sha,dec_o,attr_o,sinc_o,intel_o,fun_o,
+                           amb_o,shar_o,like_o,prob_o,met_o,age,imprace,imprelig,goal,date,go_out,
+                           sports,tvsports,exercise,dining,	museums,	art,	hiking,	gaming,	clubbing,
+                           reading,	tv,	theater,	movies,	concerts,	music,	shopping,	yoga,	exphappy,	expnum,
+                           attr1_1,	sinc1_1,	intel1_1,	fun1_1,	amb1_1,	shar1_1,	attr2_1,	sinc2_1,	intel2_1,
+                           fun2_1,	amb2_1,	shar2_1,	attr3_1,	sinc3_1,	fun3_1,	intel3_1,	amb3_1,	dec,
+                           attr,	sinc,	intel,	fun,	amb,	shar,	like,	prob,	met)) 
+#build correlation table and get correlation of "match"
+cormat = round(cor(na.omit(sgf)),2) 
+sort(cormat[,1],decreasing = TRUE)
+#select high corr feature
+my_data = subset(df,select=c(match,like_o,like,shar_o,shar,attr_o,prob_o,attr,prob,fun_o,fun))
+#build heatmap of correlation table for high corr features
+corr = cor(na.omit(my_data))
+col = colorRampPalette(c("blue", "white", "red"))(20)
+heatmap(x = corr, col = col,symm=TRUE)
+#get more detailed information of correlation table
+chart.Correlation(my_data, histogram=TRUE, pch=19)
+
+# based on the heatmap, we can see individually all of features do not have high correlation with match. Following features have relatively high correlation with match: 
+#like: over all score of how much this member like the partner.(rate by member)
+#like_o: over all score of how much the partner like this member (rate by partner)
+#shar: over all score of this member shared same hobbies with the partner.(rate by member)
+#shar_o: over all score of the partner shared same hobbies with this member.(rate by partner)
+#attr_o: rating by partner for member, based on all 6 attributes (attractive,sincere,intelligent,fun,ambitious,shared interests).
+#attr:rating by member for partner, based on all 6 attributes (attractive,sincere,intelligent,fun,ambitious,shared interests).
+#fun, fun_o: how they rate each other based on fun
+#prob,prob_o: how they rate each based on question: How probable do you think it is that this person will say 'yes' for you?
+```
+
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: What attributes(Attractive, Sincere, Intelligent, Fun, Ambitious, Shared Interests/Hobbies) are relatively important in a potential date for men and women?
+- Q2: Is there a significant relationship between people’s income and their primary goal in participating of a date?
+- Q3: Is there a correlation between the fields of study with the chance to get a match partner in speed match making? If so, which field of study has the greatest advantage in mate selection?
+- Q4: Which parameters play the most important roles when they decide to keep dating after the event?
+
+
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+Our group decided to investigate Q3 and Q4 in further detail.
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+# For Question 3
+```{r, warning=F}
+dataset = dataset %>% drop_na(match,gender,field)
+dataset_field_match = subset(dataset, match=="1")
+match_count_field = data.frame(tabyl(dataset, match, field))
+head(match_count_field)
+ggplot(data.frame(dataset_field_match), aes(x=field)) +
+  geom_bar()+theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank())
+
+match_count_field = data.frame(t(match_count_field[2,-1]))
+```
+
+From the plot, we can see that people who work in roughly five kind of field are likely get a match.
+
+```{r}
+sort(match_count_field$X2, decreasing = TRUE)[1:5]
+rbind(subset(match_count_field,match_count_field==111),subset(match_count_field,match_count_field==98),subset(match_count_field,match_count_field==69),subset(match_count_field,match_count_field==45),subset(match_count_field,match_count_field==36))
+```
+
+Hence, we can see that people who work in Business, Law, MBA, Social.Work, and International.Affairs are likely get a match.
+
+
+# For Question 4
+```{r, warning=F}
+#pick all data from survey 3-4 weeks after the end of event (follow up 2)
+sgf2 = subset(df,select = c(numdat_3,	num_in_3,	attr1_3,	sinc1_3,	intel1_3,	fun1_3,	amb1_3,	shar1_3,	attr7_3,	sinc7_3,
+                           intel7_3,	fun7_3,	amb7_3,	shar7_3,	attr4_3,	sinc4_3,	intel4_3,	fun4_3,	amb4_3,
+                           shar4_3,	attr2_3,	sinc2_3,	intel2_3,	fun2_3,	amb2_3,	shar2_3,	attr3_3,
+                           sinc3_3,	intel3_3,	fun3_3,	amb3_3,	attr5_3,	sinc5_3,	intel5_3,	fun5_3,	amb5_3))
+#calculate number of dates for each member, stored in num_date
+sgf2$num_date = sgf2$numdat_3+sgf2$num_in_3
+
+#sgf2 = subset(sgf2,select = -c(numdat_3,	num_in_3))%>%
+  #dplyr::filter(!is.na(num_date))
+
+#build correlation table and get correlation of "num_date"
+cormat2 = round(cor(na.omit(sgf2)),2)
+sort(cormat2[,length(cormat2[,1])],decreasing = TRUE)
+#select high corr feature
+my_data2 = subset(sgf2,select=c(num_date,amb2_3,intel4_3,attr3_3,attr4_3, amb7_3,attr2_3))
+#build heatmap of correlation table for high corr features
+corr2 = cor(na.omit(my_data2))
+col = colorRampPalette(c("blue", "white", "red"))(20)
+heatmap(x = corr2, col = col,symm=TRUE)
+#get more detailed information of correlation table
+chart.Correlation(my_data2, histogram=TRUE, pch=19)
+
+# based on the heatmap, we can see individually all of features do not have high correlation with number of dates. Following features have relatively high correlation with number of future dates for each member: 
+#amb2_3:What do you think the opposite sex looks for a person who is ambitious in a date? 
+#attr2_3: What do you think the opposite sex looks for a person who is attractive in a date? 
+#attr3_3: rate your opinion of your own attractive
+#attr4_3: rate the importance of attractive
+#intel4_3: rate the importance of inteligent
+#amb7_3: best reflects the actual importance of ambitious in your decisions.
+
+```
+
+
+# Summary
+
+      From investigating the initial questions, we’ve learned many fun facts about the overall environment of speed dating around factors like gender, psychological behaviors, age, etc. As we investigate the data, we found out that the highest percentage of “non-match” and “match” all exist in a similar age group, at around age 22-28. We think this situation happens because between this age, people are more unstable which could be one of the reasons that contribute to the result of “non-match”. Moreover, in this age group, people have an advantage in age compared to other ages, which could be one of the reasons that contribute to the result of “match”. From analyzing our data, the unusual thing is that there are zero native Americans who participate in the speed dating activity among the race’s majority. The number of zero is unusual as due to a large sample size, in most cases, there should possibly be at least one native American participating in the speed dating activity. One thing that is surprising in our data is that the ultimate factor that leads most people going to speed dating is out of newness. In the data visualization of question 4, we can see the two reasons: “go for fun or meet new people” rank at the top. The ultimate point behind these two questions is people’s mind of curiosity. One question that helps us a lot in leading out other questions is that “What race has most people looking for speed dating?” As when we analyzed this question by visualizing the distribution among races, we also analyze how two genders of the different races act in the question. After we’ve dug deep into this question by adding the gender distribution, we also analyze the gender distribution in most of the rest questions. In this way, we can get more details about the potentially different or similar thinking patterns of females and males. From doing this, we also pull out questions like “How’s it distributed in different gender groups?” The gender aspect takes an important position in our further questions.
+      These follow-up questions are interesting and helpful for the survey, as the data is analyzed to find a link between speed-dating people's characteristics and dating fit. That is to say, by understanding the features of people involved in speed dating, the success rate of speed dating can be effectively predicted, and a predictive model can be built. One of our new questions is to analyze if there is a correlation between the fields of study with the chance to get a matching partner in speed matchmaking. Five career areas stand out from our bar chart and their counts are roughly 110, 100, 70, 50, and 40. In other words, the dating crowd in these five fields has a very high matching success rate. The five areas are Business, Law, MBA, Social Work, and International Affairs. From the data, we can infer that when a person who participates in speed dating has a career direction in those five fields, the success rate of his successful pairing with his partner will be high. Our second question was about what factors influenced participants to continue dating. In our categorical comparison of the characteristics of people who went on to date, we found some pairs of features significantly associated with the number of dates from the correlation matrix. These include rating their opinion of their own attractiveness, rating the importance of attractiveness, rating the importance of intelligence, best reflecting the actual significance of ambition in their decisions, etc. From the table on the follow-up questions we asked, we learned that heatmaps make it easy to visualize complex data and understand it at a glance. We also used the correlation matrix plot to analyze the significance of the variables.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
